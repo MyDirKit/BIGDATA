@@ -1,0 +1,57 @@
+#Begin: Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: covid-cases
+  labels:
+    app: covid-cases
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: covid-cases-web
+  template:
+    metadata:
+      labels:
+        app: covid-cases-web
+    spec:
+      containers:
+        - name: covid-cases-web
+          image: sangenendt/covid-cases
+          ports:
+            - containerPort: 3000
+
+---
+#Begin: Service
+kind: Service
+apiVersion: v1
+metadata:
+  name: covid-cases-service
+spec:
+  selector:
+    app: covid-cases-web
+  ports:
+    - protocol: TCP
+      port: 3000
+      targetPort: 3000
+#End: Service
+
+---
+#Begin: Ingress
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: covid-cases-ingress
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+spec:
+  rules:
+    - http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: covid-cases-service
+                port:
+                  number: 3000

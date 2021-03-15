@@ -1,0 +1,15 @@
+<h1>{{ topTenTitle }}</h1> <span>Sortieren nach: <a href="/report/order/cases">Fälle</a> <a href="/report/order/topTen">TopTen</a></span>		
+<p>
+    <ol style="margin-left: 2em;">
+        {% for item in topTen %}
+            <li><img width="50" height="25" src="{{ item.flagUrl }}"> <p>{{ item.country }}</p></li>
+        {% endfor %}
+    </ol> 
+</p>
+<h1>Alle Länder</h1>
+<ul>
+    {% for item in countries %}
+        <li><img width="50" height="25" src="{{ item.flagUrl }}"> <a href="/report/{{item.countryCode}}">{{ item.countryCode }} - {{ item.country }}</a></li>
+    {% endfor %}
+</ul>
+    

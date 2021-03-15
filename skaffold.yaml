@@ -1,0 +1,21 @@
+apiVersion: skaffold/v2alpha4
+kind: Config
+
+metadata:
+  name: covid-cases
+
+build:
+  artifacts:
+    - image: sangenendt/covid-cases
+      context: web-app
+
+    - image: sangenendt/new-cases-spark
+      context: spark-app-cases
+
+    - image: sangenendt/popular-countries-spark
+      context: spark-app-popular  
+
+deploy:
+  kubectl:
+    manifests:
+      - k8s/*.yaml
