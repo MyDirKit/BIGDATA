@@ -8,6 +8,9 @@ const express = require('express')
 const nunjucks  = require('nunjucks');
 const app = express()
 
+
+app.use(express.json())
+
 const cacheTimeSecs = 15
 
 let options = optionparser
@@ -19,6 +22,7 @@ let options = optionparser
 	.option('--kafka-topic-tracking <topic>', "Kafka topic to tracking data send to", "tracking-data")
 	.option('--kafka-topic-case <topic>', "Kafka topic to case data send to", "case-data")
 	.option('--kafka-client-id < id > ', "Kafka client ID", "tracker-" + Math.floor(Math.random() * 100000))
+	.option('--kafka-client-id2 < id > ', "Kafka client ID", "tracker-" + Math.floor(Math.random() * 100000))
 	// Memcached options
 	.option('--memcached-hostname <hostname>', 'Memcached hostname (may resolve to multiple IPs)', 'my-memcached-service')
 	.option('--memcached-port <port>', 'Memcached port', 11211)
@@ -99,74 +103,26 @@ const kafka = new Kafka({
 	}
 })
 
+const kafka2 = new Kafka({
+	clientId: options.kafkaClientId2,
+	brokers: [options.kafkaBroker],
+	retry: {
+		retries: 0
+	}
+})
+
 const producer = kafka.producer()
+const producer2 = kafka2.producer()
 
 async function sendCaseData(data) {
-	await producer.connect()
+	await producer2.connect()
 
-	await producer.send({
+	await producer2.send({
 		topic: options.kafkaTopicCase,
 		messages: [
 			{ value: JSON.stringify(data) }
 		]
 	})
-}
-
-async function getReport(countryCode) {
-	const query = "SELECT countryCode, country, flagUrl, description, totalCases, curedCases FROM countries LEFT JOIN reported_cases ON countries.countryCode=reported_cases.countryCode WHERE countryCode = ?"
-	const key = 'countryCode_' + countryCode
-	let cachedata = await getFromCache(key)
-
-	if (cachedata) {
-		console.log(`Cache hit for key=${key}, cachedata = ${cachedata}`)
-		return { ...cachedata, cached: true }
-	} else {
-		console.log(`Cache miss for key=${key}, querying database`)
-
-		let data = (await executeQuery(query, [countryCode])).fetchOne()
-		if (data) {
-			let result = { countryCode: data[0], country: data[1], description: data[2] }
-			console.log(`Got result=${result}, storing in cache`)
-			if (memcached)
-				await memcached.set(key, result, cacheTimeSecs);
-			return { ...result, cached: false }
-		} else {
-			throw "No data found for this country"
-		}
-	}
-}
-
-async function getcountries() {
-	const key = 'countries'
-	let cachedata = await getFromCache(key)
-
-	if (cachedata) {
-		console.log(`Cache hit for key=${key}, cachedata = ${cachedata}`)
-		return { result: cachedata, cached: true }
-	} else {
-		console.log(`Cache miss for key=${key}, querying database`)
-		let executeResult = await executeQuery("SELECT countryCode, country, flagUrl, description FROM countries", [])
-		let data = executeResult.fetchAll()
-		if (data) {
-			let result = data.map(row => row[0])
-			console.log(`Got result=${result}, storing in cache`)
-			if (memcached)
-				await memcached.set(key, result, cacheTimeSecs);
-			return { result, cached: false }
-		} else {
-			throw "No countires found"
-		}
-	}
-}
-
-async function getTopTenCountries(type) {
-	let query = "SELECT country, flagUrl FROM most_popular_country LEFT JOIN countries ON most_popular_country.countryCode=countries.countryCode ORDER BY count LIMIT 10"
-	if(type==="cases")
-	{
-		query = "SELECT country, flagUrl FROM reported_cases LEFT JOIN countries ON reported_cases.countryCode=countries.countryCode ORDER BY totalCases LIMIT 10"
-	}
-	return (await executeQuery(query, []))
-		.fetchAll().map(row =>  row[0] )
 }
 
 async function sendTrackingMessage(data) {
@@ -180,6 +136,77 @@ async function sendTrackingMessage(data) {
 	})
 }
 
+async function getReport(countryCode) {
+	const query = "SELECT countryCode, country, flagUrl, description FROM countries WHERE countryCode = ?"
+	const queryCases = "SELECT totalCases, curedCases FROM reported_cases WHERE countryCode = ?"
+	const key = 'countryCode_' + countryCode
+	let cachedata = await getFromCache(key)
+
+	if (cachedata) {
+		console.log(`Cache hit for key=${key}`)
+		return { result: cachedata, cached: true }
+	} else {
+		console.log(`Cache miss for key=${key}, querying database`)
+
+		let dataCountry = (await executeQuery(query, [countryCode])).fetchOne()
+		let dataCase = (await executeQuery(queryCases, [countryCode])).fetchOne()
+		if (dataCountry) {
+			let result = { 
+				countryCode: dataCountry[0], 
+				country: dataCountry[1], 
+				flagUrl: dataCountry[2], 
+				description: dataCountry[3], 
+				totalCases: dataCase ? dataCase[0] : 0, 
+				curedCases: dataCase ? dataCase[1] : 0
+			}
+			console.log(`Got result, storing in cache`)
+			if (memcached)
+				await memcached.set(key, result, cacheTimeSecs);
+			return { result: result, cached: false }
+		} else {
+			throw "No data found for this country"
+		}
+	}
+}
+
+async function getcountries() {
+	const key = 'countries'
+	let cachedata = await getFromCache(key)
+
+	if (cachedata) {
+		console.log(`Cache hit for key=${key}`)
+		return { result: cachedata, cached: true }
+	} else {
+		console.log(`Cache miss for key=${key}, querying database`)
+		let executeResult = await executeQuery("SELECT countryCode, country, flagUrl, description FROM countries ORDER BY countryCode", [])
+		let data = executeResult.fetchAll()
+		if (data) {
+			let result = data.map(row => ({
+				 countryCode: row[0], 
+				 country: row[1], 
+				 flagUrl: row[2], 
+				 description: row[3] 
+			}))
+			console.log(`Got result, storing in cache`)
+			if (memcached)
+				await memcached.set(key, result, cacheTimeSecs);
+			return { result, cached: false }
+		} else {
+			throw "No countires found"
+		}
+	}
+}
+
+async function getTopTenCountries(type) {
+	let query = "SELECT country, flagUrl FROM most_popular_country LEFT JOIN countries ON most_popular_country.countryCode=countries.countryCode ORDER BY count LIMIT 10"
+	if(type==="cases")
+	{
+		query = "SELECT country, flagUrl FROM reported_cases LEFT JOIN countries ON reported_cases.countryCode=countries.countryCode ORDER BY totalCases DESC LIMIT 10"
+	}
+	return (await executeQuery(query, []))
+		.fetchAll().map(row =>  ({ country: row[0], flagUrl: row[1]}) )
+}
+
 function sendResponse(res, htmlpart, data) {
 	let view = {
 		osHostname: os.hostname(),
@@ -188,80 +215,77 @@ function sendResponse(res, htmlpart, data) {
 		memcachedServers: memcachedServers.length,
         htmlpart: htmlpart
 	  };
-    
-      res.render('layout.html', {...view, ...data})
+	
+    res.render('layout.html', {...view, ...data})
 }
 
 app.get("/", (req, res) => {
-	req.params
     Promise.all([getcountries(), getTopTenCountries("ten")]).then(values => {
-        const countries = values[0]
+        const countries = values[0].result
 		const topTen = values[1]
         
         let data = {
 			topTenTitle: "Die 10 meistbesuchten Länder",
-            countries: values[0],
-            topTen: values[1],
+            countries: countries,
+            topTen: topTen,
             cachedResult: values[0].cached
         }
 
 		sendResponse(res, "topCases", data)
 	})
-	
+
 })
 
 app.get("/report/order/:type", (req, res) => {
 	const type = req.params["type"];
     Promise.all([getcountries(), getTopTenCountries(type)]).then(values => {
-        const countries = values[0]
+        const countries = values[0].result
 		const topTen = values[1]
         
         let data = {
 			topTenTitle: type!=="cases" ? "Die 10 meistbesuchten Länder" : "Die 10 Länder mit den meisten Fällen",
-            countries: values[0],
-            topTen: values[1],
+            countries: countries,
+            topTen: topTen,
             cachedResult: values[0].cached
         }
-
 		sendResponse(res, "topCases", data)
 	})
 })
 
 app.get("/report/:countryCode", (req, res) => {
-	const countryCode = req.params["countryCode"];
+	const countryCode = req.params["countryCode"].toUpperCase();
     sendTrackingMessage({
-		countryCode,
+		countryCode: countryCode,
 		timestamp: Math.floor(new Date() / 1000)
 	}).then(() => console.log("Sent to kafka"))
 		.catch(e => console.log("Error sending to kafka", e))
     
-    getReport(countryCode).then(data => {
-        let viewData = {
-            countryCode: data.countryCode,
-            country: data.country,
-			flagUrl: data.flagUrl,
-            description: data.description,
-            totalCases: data.totalCases,
-            curedCases: data.curedCases,
-            cachedResult: data.cached
-        }
+	getReport(countryCode).then(data => {
+		let viewData = {
+			countryCode: data.result.countryCode,
+			country: data.result.country,
+			flagUrl: data.result.flagUrl,
+			description: data.result.description,
+			totalCases: data.result.totalCases,
+			curedCases: data.result.curedCases,
+			cachedResult: data.cached
+		}
+		sendResponse(res, "country", viewData)
+	}).catch(err => {
+		res.send(`<h1>Error</h1><p>${err}</p>`)
+	})
 
-        sendResponse(res, "country", viewData)
-    }).catch(err => {
-        sendResponse(res, `<h1>Error</h1><p>${err}</p>`, false)
-    })
+	
 });
 
-app.post("/report/:countryCode", (req, res) => {
-	let countryCode = req.params["countryCode"]
-    let newCases = req.params["newCases"]
-    let newCuredCases = req.params["newCuredCases"]
+app.post("/report", (req, res) => {
+	let data = req.body
 
-	sendCaseData({
-		countryCode,
+	sendCaseData({ 
+		countryCode: data.countryCode,
 		timestamp: Math.floor(new Date() / 1000),
-        newCases,
-        newCuredCases
+        newCases: data.newCases,
+        newCuredCases: data.newCuredCases
 	}).then(() => console.log("Sent to kafka"))
 		.catch(e => console.log("Error sending to kafka", e))
 

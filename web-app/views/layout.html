@@ -1,7 +1,7 @@
 <!DOCTYPE html>
-		<html lang="en">
+	<html lang="de">
 		<head>
-			<meta charset="UTF-8">
+			<meta http-equiv="content-type" content="text/html; charset=utf-8">
 			<meta name="viewport" content="width=device-width, initial-scale=1.0">
 			<title>Big Data Use-Case: Covid Reporter</title>
 			<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/mini.css/3.0.1/mini-default.min.css">
@@ -32,14 +32,15 @@
 
                         const options = {
                             method: 'POST',
-                            body: JSON.stringify(newCases),
+                            body: JSON.stringify(cases),
                             headers: {
                                 'Content-Type': 'application/json'
-                            }
+                            },
+							cache: 'no-cache'
                         }
 
                         console.log("Country code " + cases.countryCode + " with new cases: " + cases.newCases + " and cured: " + cases.newCuredCases)
-                        fetch("/report/" + cases.countryCode, options) 
+                        fetch("/report", options) 
                     }
 				}
 
@@ -49,28 +50,32 @@
 					for(var i = 0; i < maxRepetitions; ++i) {
 						const ccID = Math.floor(Math.random() * countryCodes.length)
 						console.log("Fetching country code " + countryCodes[ccID])
-						fetch("/report/" + countryCodes[ccID], {cache: 'no-cache'})
+						fetch("/report/" + countryCodes[ccID], {})
 					}
 				}
 			</script>
 		</head>
 		<body>
-			<h1>Big Data Use Case: Covid Reporter</h1>
-			<p>
-				<a href="javascript: fetchRandomCoutnries();">Zuffällige Länder besuchen</a>
-				<span id="outcountry"></span>
-                <br>
-                <a href="javascript: generateRandomCases();">Zufällige COVID Fälle generieren</a>
-                <span id="outcases"></span>
-			</p>
-			<hr>
-			<h2>Information about the generated page</h4>
-			<ul>
-				<li>Server: {{ osHostname }}</li>
-				<li>Zeitstempel: {{ date }}</li>
-				<li>CacheServer: {{ memcachedServer }} ({{ memcachedServers }})</li>
-				<li>Cached result: {{ cachedResult }}</li>
-			</ul>
+			<div style="width: 100%;">
+				<h1>Big Data Use Case: Covid Reporter</h1>
+				<p>
+					<a href="javascript: fetchRandomCoutnries();">Zuffällige Länder besuchen</a>
+					<span id="outcountry"></span>
+					<br>
+					<a href="javascript: generateRandomCases();">Zufällige COVID Fälle generieren</a>
+					<span id="outcases"></span>
+				</p>
+				<hr>
+			</div>
+			<div  {% if htmlpart == "topCases" %} style="width: 50%;float: right; min-height: 50vh;" {% endif %}>
+				<h2>Information about the generated page</h4>
+				<ul>
+					<li>Server: {{ osHostname }}</li>
+					<li>Zeitstempel: {{ date }}</li>
+					<li>CacheServer ({{ memcachedServers }}): {{ memcachedServer }}</li>
+					<li>Cached result: {{ cachedResult }}</li>
+				</ul>
+			</div>
 
 			{% if htmlpart == "topCases" %}
 				{% include  "topCases.html" %}
