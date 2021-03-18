@@ -37,9 +37,9 @@ trackingMessages = kafkaMessages.select(
     from_unixtime(column('json.timestamp'))
     .cast(TimestampType())
     .alias("parsed_timestamp"),
-
     column("json.*")
-).withColumnRenamed('json.countryCode', 'countryCode') \
+).withColumn("date", to_date(col("parsed_timestamp"))) \
+.withColumnRenamed('json.countryCode', 'countryCode') \
 .withColumnRenamed('json.newCases', 'countryCode') \
 .withColumnRenamed('json.newCuredCases', 'countryCode') \
 .withWatermark("parsed_timestamp", windowDuration)
@@ -51,8 +51,10 @@ cases = trackingMessages.groupBy(
         windowDuration,
         slidingDuration
     ),
-    column("countryCode")) \
+    column("countryCode"),
+    column("date")) \
 .sum("newCases", "newCuredCases") \
+.withColumn("date", col("date").cast("string")) \
 .withColumnRenamed("sum(newCases)", "totalCases") \
 .withColumnRenamed("sum(newCuredCases)","curedCases")
 
@@ -74,9 +76,9 @@ def saveToDatabase(batchDataframe, batchId):
 
         for row in iterator:
             sql = session.sql("INSERT INTO reported_cases "
-                              "(countryCode, totalCases, curedCases) VALUES (?, ?, ?) "
+                              "(countryCode, date, totalCases, curedCases) VALUES (?, ?, ?, ?) "
                               "ON DUPLICATE KEY UPDATE totalCases=?, curedCases=?")
-            sql.bind(row.countryCode, row.totalCases, row.curedCases, row.totalCases, row.curedCases).execute()
+            sql.bind(row.countryCode, row.date, row.totalCases, row.curedCases, row.totalCases, row.curedCases).execute()
 
         session.close()
     batchDataframe.foreachPartition(save_to_db)

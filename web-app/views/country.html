@@ -1,3 +1,65 @@
+<head>
+    <script>
+        window.onload = function () {        
+        var chart = new CanvasJS.Chart("timelineCases", {
+            animationEnabled: true,
+            title: {
+                text: "Zeitlicher Verlauf"
+            },
+            axisX: {
+                valueFormatString: "DD-MM-YYYY",
+                minimum: new Date('{{ caseData[0].date }}'),
+                maximum: new Date()
+            },
+            axisY: {
+                title: "Anzahl"
+            },
+            legend: {
+                verticalAlign: "top",
+                horizontalAlign: "right",
+                dockInsidePlotArea: true
+            },
+            toolTip: {
+                shared: true
+            },
+            data: [{
+                name: "Neue Corona Fälle",
+                showInLegend: true,
+                legendMarkerType: "square",
+                type: "area",
+                color: "rgba(40,175,101,0.6)",
+                markerSize: 0,
+                dataPoints: [
+                {% set c = 0 %}
+                {% for item in caseData %}
+                    {% set c = c + item.cases %}
+                    { x: new Date('{{ item.date }}'), y: {{ c }} },
+                {% endfor %}
+                { x: new Date(), y: {{ c }} }
+                ]
+            },
+            {
+                name: "Geheilte Personen",
+                showInLegend: true,
+                legendMarkerType: "square",
+                type: "area",
+                color: "rgba(0,75,141,0.7)",
+                markerSize: 0,
+                dataPoints: [
+                {% set cc = 0 %}
+                {% for item in caseData %}
+                    {% set cc = cc + item.cured %}
+                    { x: new Date('{{ item.date }}'), y: {{ cc }} },
+                {% endfor %}
+                { x: new Date(), y: {{ cc }} }
+                ]
+            }]
+        });
+        chart.render();
+        
+        }
+    </script>
+</head>
 <div>
     <h2>Land: {{ country }}</h2>
     <h3>Kürzel: {{ countryCode }}</h3>
@@ -6,5 +68,7 @@
     <br>
     <p>COVID Fälle: {{ totalCases }}</p>
     <p>Geheilte Personen: {{ curedCases }}</p>
+    <div id="timelineCases" style="height: 370px; max-width: 100%; margin: 0px auto;"></div>
     <a href="/">Zurück</a>
 </div>
+

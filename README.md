@@ -1,9 +1,16 @@
-# Use Case: Popular NASA Shuttle Missions
+# Use Case: Basic Covid Reporter
 
 ```json
 { 
-	mission: 'sts-10', 
+	countryCode: 'DE', 
 	timestamp: 1604325221 
+}
+
+{
+	countryCode: 'DE', 
+	timestamp: 1604325221,
+	newCases: 20,
+	newCuredCases: 21
 }
 ```
 

@@ -10,6 +10,7 @@ const app = express()
 
 
 app.use(express.json())
+app.use(express.static('public'));
 
 const cacheTimeSecs = 15
 
@@ -138,7 +139,7 @@ async function sendTrackingMessage(data) {
 
 async function getReport(countryCode) {
 	const query = "SELECT countryCode, country, flagUrl, description FROM countries WHERE countryCode = ?"
-	const queryCases = "SELECT totalCases, curedCases FROM reported_cases WHERE countryCode = ?"
+	const queryCases = "SELECT DATE_FORMAT(date, '%Y-%m-%d'), totalCases, curedCases FROM reported_cases WHERE countryCode = ? ORDER BY date"
 	const key = 'countryCode_' + countryCode
 	let cachedata = await getFromCache(key)
 
@@ -149,16 +150,28 @@ async function getReport(countryCode) {
 		console.log(`Cache miss for key=${key}, querying database`)
 
 		let dataCountry = (await executeQuery(query, [countryCode])).fetchOne()
-		let dataCase = (await executeQuery(queryCases, [countryCode])).fetchOne()
+		let dataCase = (await executeQuery(queryCases, [countryCode])).fetchAll().map(
+			row =>  ({
+				date: row[0],
+				cases: row[1],
+				cured: row[2]
+			})
+		)
+		let totalCured = 0, totalCases = 0;
+		for (i = 0; i < dataCase.length; i++) {
+			totalCases += dataCase[i].cases
+			totalCured += dataCase[i].cured
+		}
 		if (dataCountry) {
 			let result = { 
 				countryCode: dataCountry[0], 
 				country: dataCountry[1], 
 				flagUrl: dataCountry[2], 
 				description: dataCountry[3], 
-				totalCases: dataCase ? dataCase[0] : 0, 
-				curedCases: dataCase ? dataCase[1] : 0
+				totalCases: totalCases, 
+				curedCases: totalCured
 			}
+			result = {...result, caseData: dataCase}
 			console.log(`Got result, storing in cache`)
 			if (memcached)
 				await memcached.set(key, result, cacheTimeSecs);
@@ -201,10 +214,10 @@ async function getTopTenCountries(type) {
 	let query = "SELECT country, flagUrl FROM most_popular_country LEFT JOIN countries ON most_popular_country.countryCode=countries.countryCode ORDER BY count LIMIT 10"
 	if(type==="cases")
 	{
-		query = "SELECT country, flagUrl FROM reported_cases LEFT JOIN countries ON reported_cases.countryCode=countries.countryCode ORDER BY totalCases DESC LIMIT 10"
+		query = "SELECT country, flagUrl, (SUM(totalCases)) AS TOTAL FROM reported_cases LEFT JOIN countries ON reported_cases.countryCode=countries.countryCode GROUP BY countries.countryCode ORDER BY TOTAL DESC LIMIT 10"
 	}
 	return (await executeQuery(query, []))
-		.fetchAll().map(row =>  ({ country: row[0], flagUrl: row[1]}) )
+		.fetchAll().map(row =>  ({ country: row[0], flagUrl: row[1], totalCases: row[2]}) )
 }
 
 function sendResponse(res, htmlpart, data) {
@@ -268,7 +281,8 @@ app.get("/report/:countryCode", (req, res) => {
 			description: data.result.description,
 			totalCases: data.result.totalCases,
 			curedCases: data.result.curedCases,
-			cachedResult: data.cached
+			cachedResult: data.cached,
+			caseData: data.result.caseData
 		}
 		sendResponse(res, "country", viewData)
 	}).catch(err => {

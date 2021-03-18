@@ -2,10 +2,15 @@
     <h1>{{ topTenTitle }}</h1> <span>Sortieren nach: <a href="/report/order/cases">Fälle</a> <a href="/report/order/topTen">TopTen</a></span>		
     <p>
         <ol style="margin-left: 2em;">
+            {% if topTen[0].totalCases != null %}
+                {% set max = topTen[0].totalCases %}
+            {% endif %}
+
             {% for item in topTen %}
+                {% set value = (item.totalCases / max) * 100 %}
                 <li> 
-                    <p>
-                        <img width="21" height="10" src="{{ item.flagUrl }}"> {{ item.country }}
+                    <p {% if item.totalCases != null %}  style="background-color: rgba(191, 21, 14, 0.6); width: {{ value }}%;" {% endif %}>
+                        <img width="21" height="10" src="{{ item.flagUrl }}"> {{ item.country }}{% if item.totalCases != null %}({{ item.totalCases }}){% endif %}
                     </p>
                 </li>
             {% endfor %}

@@ -16,9 +16,10 @@ data:
 
     CREATE TABLE `reported_cases` (
       `countryCode` VARCHAR(10) NOT NULL,
+      `date` DATETIME NOT NULL,
       `totalCases`  BIGINT,
       `curedCases` BIGINT,
-      PRIMARY KEY (`countryCode`)
+      PRIMARY KEY (`countryCode`, `date`)
     );
 
     CREATE TABLE `countries` (
