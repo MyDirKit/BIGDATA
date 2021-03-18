@@ -1,11 +1,15 @@
 # Use Case: Basic Covid Reporter
 
+# Popular JSON
 ```json
 { 
 	countryCode: 'DE', 
 	timestamp: 1604325221 
 }
+```
 
+# Cases JSON
+```json
 {
 	countryCode: 'DE', 
 	timestamp: 1604325221,
@@ -13,6 +17,14 @@
 	newCuredCases: 21
 }
 ```
+
+## Overview
+# Landing Page
+[Display](/sceenshots/LandingPage.png?raw=true "Top Ten Cases")
+
+# Architecture
+[Display](/sceenshots/architecture.png?raw=true "Architecture")
+
 
 ## Prerequisites
 
